@@ -1,37 +1,29 @@
 {
   "schemaVersion": 1,
-  "id": "modid",
+  "id": "libsimplemultiblock",
   "version": "${version}",
 
-  "name": "Example Mod",
-  "description": "This is an example description! Tell everyone what your mod is about!",
+  "name": "LibSimpleMultiblock",
+  "description": "Allows the creation of simple multiblocks that can be changed in shape by datapacks",
   "authors": [
-    "Me!"
+    "bluepython508"
   ],
   "contact": {
-    "homepage": "https://fabricmc.net/",
-    "sources": "https://github.com/FabricMC/fabric-example-mod"
+    "sources": "https://github.com/bluepython508/LibSimpleMultiblock"
   },
 
-  "license": "CC0-1.0",
-  "icon": "assets/modid/icon.png",
+  "license": "GPL-3.0",
 
   "environment": "*",
   "entrypoints": {
     "main": [
-      "net.fabricmc.example.ExampleModKt::init"
+      "io.github.bluepython508.libsimplemultiblock.MultiblockKt::init"
     ]
   },
-  "mixins": [
-    "modid.mixins.json"
-  ],
   "depends": {
     "fabricloader": ">=0.8.7",
     "fabric": "*",
     "fabric-language-kotlin": "*",
     "minecraft": "1.16.x"
-  },
-  "suggests": {
-    "flamingo": "*"
   }
 }
