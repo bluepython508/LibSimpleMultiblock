@@ -1,22 +1,16 @@
 package io.github.bluepython508.libsimplemultiblock
 
-import com.beust.klaxon.JsonArray
-import com.beust.klaxon.JsonObject
-import com.beust.klaxon.Parser
+import kotlinx.serialization.json.*
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper
 import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener
 import net.fabricmc.fabric.api.tag.TagRegistry
 import net.minecraft.block.Block
 import net.minecraft.block.BlockState
-import net.minecraft.entity.player.PlayerEntity
 import net.minecraft.resource.ResourceManager
 import net.minecraft.resource.ResourceType
 import net.minecraft.state.StateManager
 import net.minecraft.state.property.BooleanProperty
-import net.minecraft.util.ActionResult
-import net.minecraft.util.Hand
 import net.minecraft.util.Identifier
-import net.minecraft.util.hit.BlockHitResult
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3i
 import net.minecraft.util.registry.Registry
@@ -26,11 +20,24 @@ import java.io.InputStream
 
 internal const val MODID = "libsimplemultiblock"
 
-internal fun JsonObject.ident(s: String): Identifier? = string(s)?.let(Identifier::tryParse)
-
 internal operator fun Vec3i.minus(other: Vec3i): Vec3i = Vec3i(x - other.x, y - other.y, z - other.z)
 
 internal val allPatterns: MutableMap<Identifier, Pattern> = mutableMapOf()
+
+val JsonElement.string: String?
+    get() = runCatching {
+        jsonPrimitive.run { content.takeIf { isString } }
+    }.getOrNull()
+
+val JsonElement.array: JsonArray? get() = runCatching { jsonArray }.getOrNull()
+
+fun JsonObject.array(key: String): JsonArray? = get(key) as? JsonArray
+
+fun JsonObject.obj(key: String): JsonObject? = get(key) as? JsonObject
+
+fun JsonObject.string(key: String): String? = get(key)?.string
+
+fun JsonObject.ident(key: String): Identifier? = string(key)?.let(Identifier::tryParse)
 
 internal fun matches(it: Any): ((BlockState) -> Boolean)? {
     if (it is String) {
@@ -40,8 +47,8 @@ internal fun matches(it: Any): ((BlockState) -> Boolean)? {
     } else if (it is JsonObject) {
         return it.ident("block")?.let(Registry.BLOCK::get)
             ?.let { block -> { state: BlockState -> state.isOf(block) } }
-            ?: it.ident("tag")?.let(TagRegistry::block)
-                ?.let { tag -> { state: BlockState -> state.isIn(tag) } }
+            ?: it.ident("tag").let(TagRegistry::block)
+                .let { tag -> { state: BlockState -> state.isIn(tag) } }
     }
     return null
 }
@@ -54,19 +61,19 @@ internal class Pattern(private val pattern: Map<Vec3i, (BlockState) -> Boolean>)
 
     companion object {
         fun load(stream: InputStream): Pair<Identifier, Pattern>? {
-            val pat = Parser.default().parse(stream) as JsonObject
+            val pat = Json.parseToJsonElement(stream.reader().readText()) as? JsonObject ?: return null
             val id = pat.ident("id") ?: return null
             val key = pat.obj("key")?.map {
-                (it.key.singleOrNull()?.takeUnless { c -> c == ' ' } ?: return null) to (it.value?.let(::matches)
+                (it.key.singleOrNull().takeUnless { c -> c == ' ' } ?: return null) to (it.value.let(::matches)
                     ?: return null)
             }?.toMap() ?: return null
-            val baseKey = pat.obj("key")?.entries?.find { it.value == "base" }?.key?.singleOrNull() ?: return null
+            val baseKey = pat.obj("key")?.entries?.find { it.value.string == "base" }?.key?.singleOrNull() ?: return null
             var base: Vec3i? = null
             val shape = mutableMapOf<Vec3i, (BlockState) -> Boolean>()
-            pat.array<JsonArray<String>>("shape")?.let {
+            pat.array("shape")?.let {
                 it.reversed().forEachIndexed { y, level ->
-                    level.forEachIndexed { x, row ->
-                        row.forEachIndexed { z, c ->
+                    (level.array ?: return null).forEachIndexed { x, row ->
+                        (row.string ?: return null).forEachIndexed { z, c ->
                             val v = Vec3i(x, y, z)
                             if (c == baseKey) {
                                 base = v
