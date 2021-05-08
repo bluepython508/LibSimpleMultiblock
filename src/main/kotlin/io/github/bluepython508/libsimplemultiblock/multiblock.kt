@@ -51,14 +51,14 @@ internal fun matches(it: JsonElement): ((BlockState) -> Boolean)? {
     return null
 }
 
-internal class Pattern(private val pattern: Map<Vec3i, (BlockState) -> Boolean>) {
+internal class Pattern(val id: Identifier, private val pattern: Map<Vec3i, (BlockState) -> Boolean>) {
     fun isValid(base: BlockPos, world: WorldView): Boolean =
         pattern.entries.all {
             it.value(world.getBlockState(base.add(it.key)))
         }
 
     companion object {
-        fun load(stream: InputStream): Pair<Identifier, Pattern>? {
+        fun load(stream: InputStream): Pattern? {
             val pat = Json.parseToJsonElement(stream.reader().readText()) as? JsonObject ?: return null
             val id = pat.ident("id") ?: return null
             val key = pat.obj("key")?.map {
@@ -83,7 +83,7 @@ internal class Pattern(private val pattern: Map<Vec3i, (BlockState) -> Boolean>)
                 }
             } ?: return null
             val baseLocation = base ?: return null
-            return id to Pattern(shape.map { (it.key - baseLocation) to it.value }.toMap())
+            return Pattern(id, shape.map { (it.key - baseLocation) to it.value }.toMap())
         }
     }
 }
@@ -103,12 +103,21 @@ abstract class MultiBlock(settings: Settings) : Block(settings) {
 
     fun validate(world: World, pos: BlockPos): Boolean {
         if (!world.getBlockState(pos).isOf(this)) return false
-        val valid = patterns.any { it.isValid(pos, world) } && customValidation(world, pos)
+        val validPattern = patterns.firstOrNull { it.isValid(pos, world) }
+        val valid = validPattern != null && customValidation(world, pos)
         world.setBlockState(pos, world.getBlockState(pos).with(VALID, valid), 3)
+        if (valid) {
+            onValidate(pos, world, validPattern!!.id)
+        } else {
+            onInvalidate(pos, world)
+        }
         return valid
     }
 
     open fun customValidation(world: WorldView, pos: BlockPos): Boolean = true
+
+    open fun onValidate(pos: BlockPos, world: World, pattern: Identifier) {}
+    open fun onInvalidate(pos: BlockPos, world: World) {}
 
     companion object {
         val VALID: BooleanProperty = BooleanProperty.of("valid")
@@ -124,7 +133,7 @@ fun init() {
                 allPatterns.clear()
                 for (id in manager.findResources("multiblock-patterns") { it.endsWith(".json") }) {
                     Pattern.load(manager.getResource(id).inputStream)?.let {
-                        allPatterns[it.first] = it.second
+                        allPatterns[it.id] = it
                     }
                 }
             }
