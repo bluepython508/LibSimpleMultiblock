@@ -39,11 +39,9 @@ fun JsonObject.string(key: String): String? = get(key)?.string
 
 fun JsonObject.ident(key: String): Identifier? = string(key)?.let(Identifier::tryParse)
 
-internal fun matches(it: Any): ((BlockState) -> Boolean)? {
-    if (it is String) {
-        if (it == "base") {
+internal fun matches(it: JsonElement): ((BlockState) -> Boolean)? {
+    if (it.string == "base") {
             return { true }
-        }
     } else if (it is JsonObject) {
         return it.ident("block")?.let(Registry.BLOCK::get)
             ?.let { block -> { state: BlockState -> state.isOf(block) } }
