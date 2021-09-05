@@ -90,10 +90,16 @@ publishing {
         }
     }
 
-    // select the repositories you want to publish to
+
     repositories {
-        // uncomment to publish to the local maven
-        // mavenLocal()
+        maven {
+            name = "GitHubPackages"
+            url = "https://maven.pkg.github.com/bluepython508/LibSimpleMultiblock"
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
+        }
     }
 }
 
