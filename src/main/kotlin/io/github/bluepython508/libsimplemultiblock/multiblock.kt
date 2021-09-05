@@ -3,13 +3,13 @@ package io.github.bluepython508.libsimplemultiblock
 import kotlinx.serialization.json.*
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper
 import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener
-import net.fabricmc.fabric.api.tag.TagRegistry
 import net.minecraft.block.Block
 import net.minecraft.block.BlockState
 import net.minecraft.resource.ResourceManager
 import net.minecraft.resource.ResourceType
 import net.minecraft.state.StateManager
 import net.minecraft.state.property.BooleanProperty
+import net.minecraft.tag.BlockTags
 import net.minecraft.util.Identifier
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3i
@@ -24,14 +24,11 @@ internal operator fun Vec3i.minus(other: Vec3i): Vec3i = Vec3i(x - other.x, y - 
 
 internal val allPatterns: MutableMap<Identifier, Pattern> = mutableMapOf()
 
-val JsonElement.string: String?
-    get() = runCatching {
-        jsonPrimitive.run { content.takeIf { isString } }
-    }.getOrNull()
+val JsonElement.string: String? get() = (this as? JsonPrimitive)?.run { content.takeIf { isString } }
 
-val JsonElement.array: JsonArray? get() = runCatching { jsonArray }.getOrNull()
+val JsonElement.array: JsonArray? get() = this as? JsonArray
 
-fun JsonObject.array(key: String): JsonArray? = get(key) as? JsonArray
+fun JsonObject.array(key: String): JsonArray? = get(key)?.array
 
 fun JsonObject.obj(key: String): JsonObject? = get(key) as? JsonObject
 
@@ -45,7 +42,7 @@ internal fun matches(it: JsonElement): ((BlockState) -> Boolean)? {
     } else if (it is JsonObject) {
         return it.ident("block")?.let(Registry.BLOCK::get)
             ?.let { block -> { state: BlockState -> state.isOf(block) } }
-            ?: it.ident("tag").let(TagRegistry::block)
+            ?: it.ident("tag").let(BlockTags.getTagGroup()::getTag)
                 .let { tag -> { state: BlockState -> state.isIn(tag) } }
     }
     return null
@@ -129,7 +126,7 @@ fun init() {
         .registerReloadListener(object : SimpleSynchronousResourceReloadListener {
             override fun getFabricId(): Identifier = Identifier(MODID, "patterns")
 
-            override fun apply(manager: ResourceManager) {
+            override fun reload(manager: ResourceManager) {
                 allPatterns.clear()
                 for (id in manager.findResources("multiblock-patterns") { it.endsWith(".json") }) {
                     Pattern.load(manager.getResource(id).inputStream)?.let {
