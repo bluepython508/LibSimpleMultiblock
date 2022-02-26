@@ -82,6 +82,7 @@ publishing {
     publications {
         mavenJava(MavenPublication) {
             artifactId = 'libsimplemultiblock'
+            version = "${project.mod_version}-${System.getenv("GITHUB_SHA")}"
             // add all the jars that should be included when publishing to maven
             artifact(remapJar) {
                 builtBy remapJar
